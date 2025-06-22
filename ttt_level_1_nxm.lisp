@@ -115,7 +115,7 @@
               (loop-until
                (or (not (and (<x< -1 (point-x p) width)
                              (<x< -1 (point-y p) height)))
-                   (not (eq (board-get board p) piece))
+                   (not (eql (board-get board p) piece))
                    (= c win-len))
                c
                (setq p (f tr p))
@@ -124,11 +124,11 @@
                 (point 0 -1) (point 0 1)
                 (point -1 -1) (point 1 1)
                 (point 1 -1) (point -1 1))))
-    (when (car
-           (remove-if
-            #'null
-            (mapcar (lambda (a b) (> (+ a b) win-len)) (car l) (cdr l))))
-      piece))))
+      (when (car
+             (remove-if
+              #'null
+              (mapcar (lambda (a b) (> (+ a b) win-len)) (car l) (cdr l))))
+        piece))))
 
 ;; user-facing stuff
 
@@ -143,4 +143,27 @@
       (get-var-optional players "player count")
       (list width height win-len players))))
 
-
+(defun game ()
+  (let* ((info (get-board-info))
+         (board (board-create (deref (car info)) (deref (cadr info))))
+         (player 0)
+         (done nil))
+    (loop-until done (format t "player ~a won!" player)
+          (format t (board-print board))
+          (let-n (x y) ((ref 0) (ref 0))
+            (get-var x "x position")
+            (get-var y "y position")
+            (board-set board (point (deref x) (deref y)) player)
+            (setq player (+ 1 player))
+            (when (= player (deref (cadddr info))) (setq player 0))
+            (when (board-check-at-point
+                   board
+                   (deref (car info)) (deref (cadr info))
+                   (point (deref x) (deref y))
+                   (deref (caddr info)))
+              (setq done t)))
+          (when (null
+                 (remove-if
+                  #'null
+                  (mapcar (lambda (x) (remove-if-not #'null x)) board)))
+            (return (format t "game was a tie!"))))))
