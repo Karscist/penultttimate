@@ -23,7 +23,7 @@
 ;; there is definitely a more efficient method to do this
 ;; but this is easy to write
 (defun range (min max)
-  (mapcar (lambda (x) (- x (+ 1 min))) (nreverse (calltimes (- max min) #'id))))
+  (mapcar (lambda (x) (+ x (- min 1))) (nreverse (calltimes (- max min) #'id))))
 
 (defun split-list (l)
   (cons
@@ -68,13 +68,18 @@
 (defun setref (ref x) (rplaca ref x))
 
 (defun read-input () (read-from-string (read-line)))
-(defun get-var (ref prompt)
-  (format t "~a: " prompt)
-  (finish-output)
+(defun get-var (prompt) (format t "~a: " prompt) (finish-output) (read-input))
+(defun get-var-optional (default prompt)
+  (format t "~a (default ~a): " prompt default) (finish-output)
+  (let-1 input (read-line)
+    (if (equal input "")
+        default
+        (read-from-string input))))
+(defun get-var! (ref prompt)
+  (format t "~a: " prompt) (finish-output)
   (setref ref (read-input)))
-(defun get-var-optional (ref prompt)
-  (format t "~a (default ~a): " prompt (deref ref))
-  (finish-output)
+(defun get-var-optional! (ref prompt)
+  (format t "~a (default ~a): " prompt (deref ref)) (finish-output)
   (let-1 input (read-line)
     (unless (equal input "") (setref ref (read-from-string input)))))
 
@@ -131,25 +136,11 @@
               (mapcar (lambda (a b) (> (+ a b) win-len)) (car l) (cdr l))))
         piece))))
 
-;; user-facing stuff
-
-(defun get-board-info ()
-  (eval ; this is not production code
-   `(let-n
-        (width height win-len players)
-        ,(mapcar (lambda (x) `(ref ,x)) '(3 3 3 2))
-      (get-var-optional width "board width")
-      (get-var-optional height "board height")
-      (get-var-optional win-len "how many aligned pieces needed for a win")
-      (get-var-optional players "player count")
-      (list width height win-len players))))
-
 (defun game ()
-  (let* ((info (get-board-info))
-         (width (deref (car info)))
-         (height (deref (cadr info)))
-         (win-len (deref (caddr info)))
-         (players (deref (cadddr info)))
+  (let* ((width (get-var-optional 3 "board width"))
+         (height (get-var-optional 3 "board height"))
+         (win-len (get-var-optional 3 "winning path length"))
+         (players (get-var-optional 2 "player count"))
          (board (board-create width height))
          (player 0)
          (turn 0))
@@ -157,8 +148,8 @@
      (format t (board-print board))
      (let-n (x y) ((ref nil) (ref nil))
        (loop
-        (get-var x (format nil "~a's x position" (player-id>icon player)))
-        (get-var y (format nil "~a's y position" (player-id>icon player)))
+        (get-var! x (format nil "~a's x position" (player-id>icon player)))
+        (get-var! y (format nil "~a's y position" (player-id>icon player)))
         (when (and (<x< -1 (deref x) width)
                    (<x< -1 (deref y) height)
                    (null (board-get board (point (deref x) (deref y)))))
