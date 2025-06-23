@@ -89,17 +89,18 @@
 (defun point-+ (p o)
   (point (+ (point-x p) (point-x o)) (+ (point-y p) (point-y o))))
 
+(defun player-id>icon (id)
+  (match id eql " "
+    (0 "X") (1 "O") (2 "#") (3 "*") (4 ".") (5 "&") (6 "%") (7 "7")))
+
 (defun board-create (width height)
   (duplist (calltimes height (const (calltimes width (const nil))))))
 (defun board-get (board p) (nth (point-x p) (nth (point-y p) board)))
 (defun board-set (board p val)
   (setf (nth (point-x p) (nth (point-y p) board)) val))
 (defun board-print (board)
-  (let ((board-map
-         (lambda (x)
-           (match x eq " " (0 "X") (1 "O") (2 "#") (3 "*")))))
-    (format nil "~{~{ ~a ~^│~}~%~^~:*~{~*───~^┼~}~%~}"
-            (mapcar^2 board-map board))))
+  (format nil "~{~{ ~a ~^│~}~%~^~:*~{~*───~^┼~}~%~}"
+          (mapcar^2 #'player-id>icon board)))
 
 (defun <x< (min x max) (and (> x min) (< x max)))
 
@@ -145,25 +146,36 @@
 
 (defun game ()
   (let* ((info (get-board-info))
-         (board (board-create (deref (car info)) (deref (cadr info))))
+         (width (deref (car info)))
+         (height (deref (cadr info)))
+         (win-len (deref (caddr info)))
+         (players (deref (cadddr info)))
+         (board (board-create width height))
          (player 0)
-         (done nil))
-    (loop-until done (format t "player ~a won!" player)
-          (format t (board-print board))
-          (let-n (x y) ((ref 0) (ref 0))
-            (get-var x "x position")
-            (get-var y "y position")
-            (board-set board (point (deref x) (deref y)) player)
-            (setq player (+ 1 player))
-            (when (= player (deref (cadddr info))) (setq player 0))
-            (when (board-check-at-point
-                   board
-                   (deref (car info)) (deref (cadr info))
-                   (point (deref x) (deref y))
-                   (deref (caddr info)))
-              (setq done t)))
-          (when (null
-                 (remove-if
-                  #'null
-                  (mapcar (lambda (x) (remove-if-not #'null x)) board)))
-            (return (format t "game was a tie!"))))))
+         (turn 0))
+    (loop
+     (format t (board-print board))
+     (let-n (x y) ((ref nil) (ref nil))
+       (loop
+        (get-var x (format nil "~a's x position" (player-id>icon player)))
+        (get-var y (format nil "~a's y position" (player-id>icon player)))
+        (when (and (<x< -1 (deref x) width)
+                   (<x< -1 (deref y) height)
+                   (null (board-get board (point (deref x) (deref y)))))
+          (return))
+        (format t "that position is not available, try again~%"))
+       (board-set board (point (deref x) (deref y)) player)
+       (when (board-check-at-point
+              board width height
+              (point (deref x) (deref y))
+              win-len)
+         (return (format t "~a won!~%turns taken: ~a"
+                         (player-id>icon player) turn))))
+     (when (null
+            (remove-if
+             #'null
+             (mapcar (lambda (x) (remove-if-not #'null x)) board)))
+       (return (format t "game was a tie!")))
+     (setq player (+ 1 player))
+     (when (= player players) (setq player 0))
+     (setq turn (+ 1 turn)))))
