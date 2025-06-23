@@ -3,10 +3,10 @@
 
 (setq *print-circle* t)
 
-(defpackage "penultttimate-level-1"
+(defpackage "penultttimate"
   (:use "COMMON-LISP")
   (:shadow "DEREF" "LOOP"))
-(in-package "penultttimate-level-1")
+(in-package "penultttimate")
 
 ;; this will be partially written in a pipettish style because
 ;; i forgot how to write decent CL (and don't want to)
@@ -85,43 +85,46 @@
 
 ;; should be a struct or something but i'm a cons addict and never
 ;; bothered to learn how to make data structures with any other tools
-(defun point (x y) (cons x y))
-(defun dup-point (p) (cons (car p) (cdr p)))
-(defun point-x (p) (car p))
-(defun point-y (p) (cdr p))
-(defun point-setx (p x) (rplaca p x))
-(defun point-sety (p y) (rplacd p y))
-(defun point-+ (p o)
-  (point (+ (point-x p) (point-x o)) (+ (point-y p) (point-y o))))
+(defpackage "POINT")
+(defun point::point (x y) (cons x y))
+(defun point::dup (p) (cons (car p) (cdr p)))
+(defun point::x (p) (car p))
+(defun point::y (p) (cdr p))
+(defun point::setx (p x) (rplaca p x))
+(defun point::sety (p y) (rplacd p y))
+(defun point::+ (p o)
+  (point::point (+ (point::x p) (point::x o)) (+ (point::y p) (point::y o))))
+(defun point (x y) (point::point x y)) ;; convenience function
 
 (defun player-id>icon (id)
   (match id eql " "
     (0 "X") (1 "O") (2 "#") (3 "*") (4 ".") (5 "&") (6 "%") (7 "7")))
 
-(defun board-create (width height)
+(defpackage "BOARD")
+(defun board::create (width height)
   (duplist (calltimes height (const (calltimes width (const nil))))))
-(defun board-get (board p) (nth (point-x p) (nth (point-y p) board)))
-(defun board-set (board p val)
-  (setf (nth (point-x p) (nth (point-y p) board)) val))
-(defun board-print (board)
+(defun board::get (board p) (nth (point::x p) (nth (point::y p) board)))
+(defun board::set (board p val)
+  (setf (nth (point::x p) (nth (point::y p) board)) val))
+(defun board::print (board)
   (format nil "~{~{ ~a ~^│~}~%~^~:*~{~*───~^┼~}~%~}"
           (mapcar^2 #'player-id>icon board)))
 
 (defun <x< (min x max) (and (> x min) (< x max)))
 
-(defun board-check-at-point (board width height point win-len)
-  (let-1 piece (board-get board point)
+(defun board::check-at-point (board width height point win-len)
+  (let-1 piece (board::get board point)
     (let-1 l
         (split-list
          (mapcar
           (lambda (offset)
-            (let ((p (dup-point point))
-                  (tr (lambda (pt) (point-+ pt offset)))
+            (let ((p (point::dup point))
+                  (tr (lambda (pt) (point::+ pt offset)))
                   (c 0))
               (loop-until
-               (or (not (and (<x< -1 (point-x p) width)
-                             (<x< -1 (point-y p) height)))
-                   (not (eql (board-get board p) piece))
+               (or (not (and (<x< -1 (point::x p) width)
+                             (<x< -1 (point::y p) height)))
+                   (not (eql (board::get board p) piece))
                    (= c win-len))
                c
                (setq p (f tr p))
@@ -141,32 +144,34 @@
          (height (get-var-optional 3 "board height"))
          (win-len (get-var-optional 3 "winning path length"))
          (players (get-var-optional 2 "player count"))
-         (board (board-create width height))
+         (board (board::create width height))
          (player 0)
          (turn 0))
     (loop
-     (format t (board-print board))
+     (format t "~a" (board::print board))
      (let-n (x y) ((ref nil) (ref nil))
        (loop
         (get-var! x (format nil "~a's x position" (player-id>icon player)))
         (get-var! y (format nil "~a's y position" (player-id>icon player)))
         (when (and (<x< -1 (deref x) width)
                    (<x< -1 (deref y) height)
-                   (null (board-get board (point (deref x) (deref y)))))
+                   (null (board::get board (point (deref x) (deref y)))))
           (return))
         (format t "that position is not available, try again~%"))
-       (board-set board (point (deref x) (deref y)) player)
-       (when (board-check-at-point
+       (board::set board (point (deref x) (deref y)) player)
+       (when (board::check-at-point
               board width height
               (point (deref x) (deref y))
               win-len)
-         (return (format t "~a won!~%turns taken: ~a"
-                         (player-id>icon player) turn))))
+         (return (format t "~a~a won!~%turns taken: ~a"
+                         (board::print board)
+                         (player-id>icon player)
+                         (+ 1 turn)))))
      (when (null
             (remove-if
              #'null
              (mapcar (lambda (x) (remove-if-not #'null x)) board)))
-       (return (format t "game was a tie!")))
+       (return (format t "~agame was a tie!" (board::print board))))
      (setq player (+ 1 player))
      (when (= player players) (setq player 0))
      (setq turn (+ 1 turn)))))
