@@ -3,22 +3,29 @@
 
 (setq *print-circle* t)
 
-(defpackage "penultttimate"
+(defpackage "PENULTTTIMATE"
   (:use "COMMON-LISP")
   (:shadow "DEREF" "LOOP"))
-(in-package "penultttimate")
+(in-package "PENULTTTIMATE")
 
 ;; this will be partially written in a pipettish style because
 ;; i forgot how to write decent CL (and don't want to)
 
-(defmacro f (function &rest rest) `(funcall ,function ,@rest))
+;; call a variable as if it were a function
+;; (needed because i think in terms of a lisp-1)
+(set-dispatch-macro-character
+ #\# #\*
+ (lambda (stream _1 _2)
+   (declare (ignore _1 _2))
+   `(funcall ,@(let ((x (read stream t nil t)))
+                 (if (or (atom x) (eq 'funcall (car x))) (list x) x)))))
 
 (defun id (x) x)
 (defun const (x) (lambda (_) (declare (ignore _)) x))
 (defun duplist (l) (mapcar (lambda (x) (if (typep x 'list) (duplist x) x)) l))
 
 (defun calltimes (n f)
-  (when (> n 0) (cons (funcall f n) (calltimes (- n 1) f))))
+  (when (> n 0) (cons #*(f n) (calltimes (- n 1) f))))
 
 ;; there is definitely a more efficient method to do this
 ;; but this is easy to write
@@ -85,46 +92,95 @@
 
 ;; should be a struct or something but i'm a cons addict and never
 ;; bothered to learn how to make data structures with any other tools
-(defpackage "POINT")
-(defun point::point (x y) (cons x y))
-(defun point::dup (p) (cons (car p) (cdr p)))
-(defun point::x (p) (car p))
-(defun point::y (p) (cdr p))
-(defun point::setx (p x) (rplaca p x))
-(defun point::sety (p y) (rplacd p y))
-(defun point::+ (p o)
-  (point::point (+ (point::x p) (point::x o)) (+ (point::y p) (point::y o))))
-(defun point (x y) (point::point x y)) ;; convenience function
+(defpackage "POINT"
+  (:export "POINT" "DUP" "X" "Y" "SETX" "SETY" "+"))
+(defun point:point (x y) (cons x y))
+(defun point:dup (p) (cons (car p) (cdr p)))
+(defun point:x (p) (car p))
+(defun point:y (p) (cdr p))
+(defun point:setx (p x) (rplaca p x))
+(defun point:sety (p y) (rplacd p y))
+(defun point:+ (p o)
+  (point:point (+ (point:x p) (point:x o)) (+ (point:y p) (point:y o))))
+(defun point (x y) (point:point x y)) ;; convenience function
 
 (defun player-id>icon (id)
   (match id eql " "
     (0 "X") (1 "O") (2 "#") (3 "*") (4 ".") (5 "&") (6 "%") (7 "7")))
 
-(defpackage "BOARD")
-(defun board::create (width height)
-  (duplist (calltimes height (const (calltimes width (const nil))))))
-(defun board::get (board p) (nth (point::x p) (nth (point::y p) board)))
-(defun board::set (board p val)
-  (setf (nth (point::x p) (nth (point::y p) board)) val))
-(defun board::print (board)
+(defun aset (a x &rest indexes)
+  ;; due to the standards writers being lazy, there is no non-setf array setter
+  (setf (apply #'aref a indexes) x))
+(defun vset (v x index)
+  (aset v x index))
+
+(defun make-vector (length &optional &key (initial-contents nil))
+  (make-array length :initial-contents initial-contents))
+(defun vector-foldr (f b v)
+  (do ((i 0 (+ 1 i))
+       (val b #*(f (aref v i) val)))
+      ((= i (length v)) val)))
+(defun vector-map (f v)
+  (do ((out (make-vector (length v)))
+       (i 0 (+ 1 i)))
+      ((= i (length v)) out)
+    (vset out #*(f (svref v i)) i)))
+
+(defun array-foldr (f b a)
+  (vector-foldr f b (make-array
+                     (apply #'* (array-dimensions a)) :displaced-to a)))
+(defun array-map-2d (f a)
+  ;; i couldn't figure out how to write a generalised array-map,
+  ;; but this is currently good enough for our purposes
+  (let-1 dim (array-dimensions a)
+    (do ((out (make-array dim))
+         (x 0 (+ 1 x)))
+        ((= x (car dim)) out)
+      (do ((y 0 (+ 1 y))) ((= y (cadr dim)))
+        (aset out #*(f (aref a x y)) x y)))))
+(defun array-2d>list (a)
+  ;; considering the mess array-map was looking to be,
+  ;; i'm not even going to try to generalise this
+  (let-1 dim (array-dimensions a)
+    (do ((out nil)
+         (y 0 (+ 1 y)))
+        ((= y (car dim)) (nreverse out))
+      (setq out (cons (do ((row nil)
+                           (x 0 (+ 1 x)))
+                          ((= x (cadr dim)) (nreverse row))
+                        (setq row (cons (aref a x y) row)))
+                      out)))))
+
+(defpackage "BOARD"
+  (:export "CREATE" "GET" "SET" "PRINT" "EMPTYP" "FULLP" "CHECK-AT-POINT"))
+(defun board:create (width height)
+  (make-array (list width height) :initial-element -1))
+(defun board:get (board p) (aref board (point:x p) (point:y p)))
+(defun board:set (board p val)
+  (setf (aref board (point:x p) (point:y p)) val))
+(defun board:print (board)
   (format nil "~{~{ ~a ~^│~}~%~^~:*~{~*───~^┼~}~%~}"
-          (mapcar^2 #'player-id>icon board)))
+          (array-2d>list (array-map-2d #'player-id>icon board))))
+(defun board:emptyp (board)
+  (array-foldr (lambda (x acc) (if (> 0 x) acc nil)) t board))
+(defun board:fullp (board)
+  (array-foldr (lambda (x acc) (if (> 0 x) nil acc)) t board))
 
 (defun <x< (min x max) (and (> x min) (< x max)))
 
-(defun board::check-at-point (board width height point win-len)
-  (let-1 piece (board::get board point)
+(defun board:check-at-point (board width height point win-len)
+  (let-1 piece (board:get board point)
     (let-1 l
         (split-list
          (mapcar
           (lambda (offset)
-            (let ((p (point::dup point))
-                  (tr (lambda (pt) (point::+ pt offset)))
+            (let ((p (point:dup point))
+                  (tr (lambda (pt) (point:+ pt offset)))
                   (c 0))
               (loop-until
-               (or (not (and (<x< -1 (point::x p) width)
-                             (<x< -1 (point::y p) height)))
-                   (not (eql (board::get board p) piece))
+               (or (not (and (<x< -1 (point:x p) width)
+                             (<x< -1 (point:y p) height)))
+                   (not (eql (board:get board p) piece))
                    (= c win-len))
                c
                (setq p (f tr p))
@@ -144,34 +200,31 @@
          (height (get-var-optional 3 "board height"))
          (win-len (get-var-optional 3 "winning path length"))
          (players (get-var-optional 2 "player count"))
-         (board (board::create width height))
+         (board (board:create width height))
          (player 0)
          (turn 0))
     (loop
-     (format t "~a" (board::print board))
+     (format t "~a" (board:print board))
      (let-n (x y) ((ref nil) (ref nil))
        (loop
         (get-var! x (format nil "~a's x position" (player-id>icon player)))
         (get-var! y (format nil "~a's y position" (player-id>icon player)))
         (when (and (<x< -1 (deref x) width)
                    (<x< -1 (deref y) height)
-                   (null (board::get board (point (deref x) (deref y)))))
+                   (> 0 (board:get board (point (deref x) (deref y)))))
           (return))
         (format t "that position is not available, try again~%"))
-       (board::set board (point (deref x) (deref y)) player)
-       (when (board::check-at-point
+       (board:set board (point (deref x) (deref y)) player)
+       (when (board:check-at-point
               board width height
               (point (deref x) (deref y))
               win-len)
          (return (format t "~a~a won!~%turns taken: ~a"
-                         (board::print board)
+                         (board:print board)
                          (player-id>icon player)
                          (+ 1 turn)))))
-     (when (null
-            (remove-if
-             #'null
-             (mapcar (lambda (x) (remove-if-not #'null x)) board)))
-       (return (format t "~agame was a tie!" (board::print board))))
+     (when (board:fullp board)
+       (return (format t "~agame was a tie!" (board:print board))))
      (setq player (+ 1 player))
      (when (= player players) (setq player 0))
      (setq turn (+ 1 turn)))))
