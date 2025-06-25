@@ -84,7 +84,7 @@
      ,@(mapcar λx(list (list eq val (car x)) (cadr x)) body)
      (t ,def)))
 
-(defmacro mapcar^2 (f l) `(mapcar (lambda (l2) (mapcar ,f l2)) ,l))
+(defmacro mapcar^2 (f l) `(mapcar λ[l2](mapcar ,f l2) ,l))
 
 ;; let mods
 (defmacro let-1 (sym val &body body) `(let ((,sym ,val)) ,@body))
@@ -275,9 +275,9 @@
   (format nil "~{~{ ~a ~^│~}~%~^~:*~{~*───~^┼~}~%~}"
           (array-2d>list (array-map-2d #'player-id>icon board))))
 (defun board:emptyp (board)
-  (array-foldr λxa(if (> 0 x) a nil) t board))
+  (array-foldr λx[acc](if (> 0 x) acc nil) t board))
 (defun board:fullp (board)
-  (array-foldr λxa(if (> 0 x) nil a) t board))
+  (array-foldr λx[acc](if (> 0 x) nil acc) t board))
 
 (defun board:check-at-point (board width height point win-len)
   (let-1 piece (board:get board point)
