@@ -242,19 +242,19 @@
          (turn 0))
     (loop
      (format t "~a" (board:print board))
-     (let-n (x y) ((ref nil) (ref nil))
-       (loop
-        (get-var! x (format nil "~a's x position" (player-id>icon player)))
-        (get-var! y (format nil "~a's y position" (player-id>icon player)))
-        (when (and (<x< -1 (deref x) width)
-                   (<x< -1 (deref y) height)
-                   (> 0 (board:get board (point (deref x) (deref y)))))
-          (return))
-        (format t "that position is not available, try again~%"))
-       (board:set board (point (deref x) (deref y)) player)
+      (let-n (point)
+	  ((loop
+	     (let-n (x y) ((get-var (format nil "~a's x position" (player-id>icon player)))
+			   (get-var (format nil "~a's y position" (player-id>icon player))))
+	       (when (and (<x< -1 (deref x) width)
+			  (<x< -1 (deref y) height)
+			  (> 0 (board:get board (point (deref x) (deref y)))))
+		 (return (point x y)))
+	       (format t "that position is not available, try again~%"))))
+       (board:set board point player)
        (when (board:check-at-point
               board width height
-              (point (deref x) (deref y))
+              point
               win-len)
          (return (format t "~a~a won!~%turns taken: ~a"
                          (board:print board)
