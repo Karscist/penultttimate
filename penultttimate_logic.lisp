@@ -42,7 +42,7 @@
 
 (defun id (x) x)
 (defun const (x) (lambda (_) (declare (ignore _)) x))
-(defun duplist (l) (mapcar (lambda (x) (if (typep x 'list) (duplist x) x)) l))
+(defun duplist (l) (mapcar λx(if (typep x 'list) (duplist x) x) l))
 
 (defun calltimes (n f)
   (when (> n 0) (cons #*(f n) (calltimes (- n 1) f))))
@@ -50,20 +50,20 @@
 ;; there is definitely a more efficient method to do this
 ;; but this is easy to write
 (defun range (min max)
-  (mapcar (lambda (x) (+ x (- min 1))) (nreverse (calltimes (- max min) #'id))))
+  (mapcar λx(+ x (- min 1)) (nreverse (calltimes (- max min) #'id))))
 
 (defun split-list (l)
   (cons
    (remove-if
     #'null
-    (mapcar (lambda (x n) (when (evenp n) x)) l (range 0 (length l))))
+    (mapcar λxn(when (evenp n) x) l (range 0 (length l))))
    (remove-if
     #'null
-    (mapcar (lambda (x n) (when (oddp n) x)) l (range 0 (length l))))))
+    (mapcar λxn(when (oddp n) x) l (range 0 (length l))))))
 
 (defmacro match (val eq def &body body)
   `(cond
-     ,@(mapcar (lambda (x) (list (list eq val (car x)) (cadr x))) body)
+     ,@(mapcar λx(list (list eq val (car x)) (cadr x)) body)
      (t ,def)))
 
 (defmacro mapcar^2 (f l) `(mapcar (lambda (l2) (mapcar ,f l2)) ,l))
@@ -257,9 +257,9 @@
   (format nil "~{~{ ~a ~^│~}~%~^~:*~{~*───~^┼~}~%~}"
           (array-2d>list (array-map-2d #'player-id>icon board))))
 (defun board:emptyp (board)
-  (array-foldr (lambda (x acc) (if (> 0 x) acc nil)) t board))
+  (array-foldr λxa(if (> 0 x) a nil) t board))
 (defun board:fullp (board)
-  (array-foldr (lambda (x acc) (if (> 0 x) nil acc)) t board))
+  (array-foldr λxa(if (> 0 x) nil a) t board))
 
 (defun board:check-at-point (board width height point win-len)
   (let-1 piece (board:get board point)
@@ -285,7 +285,7 @@
       (when (car
              (remove-if
               #'null
-              (mapcar (lambda (a b) (> (+ a b) win-len)) (car l) (cdr l))))
+              (mapcar λab(> (+ a b) win-len) (car l) (cdr l))))
         piece))))
 
 (defun game ()
