@@ -24,19 +24,37 @@
  #\λ
  (lambda (stream _)
    (declare (ignore _))
-   (let ((args nil) (c nil))
+   (let ((args nil) (c nil) (l nil))
      (block nil
        (tagbody
         getchar
           (setq c (read-char stream t nil t))
-          (if (eql c #\()
-              (progn
-                (unread-char c stream)
-                (setq args (nreverse args))
-                (return))
-              (progn
-                (setq args (cons (intern (string-upcase (string c))) args))
-                (go getchar)))))
+          (if
+           (eql c #\()
+           (progn
+             (unread-char c stream)
+             (setq args (nreverse args))
+             (return))
+           (if
+            (eql c #\[)
+            (tagbody
+             nextchar
+               (setq c (read-char stream t nil t))
+               (if
+                (and (eql c #\]) l)
+                (progn
+                  (setq
+                   args
+                   (cons (intern (string-upcase (coerce (nreverse l) 'string)))
+                         args))
+                  (setq l nil)
+                  (go getchar))
+                (progn
+                  (setq l (cons c l))
+                  (go nextchar))))
+            (progn
+              (setq args (cons (intern (string-upcase (string c))) args))
+              (go getchar))))))
      (let ((x (read stream t nil t)))
        `(lambda ,args ,@(if (eq 'progn (car x)) (cdr x) (list x)))))))
 
