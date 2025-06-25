@@ -161,28 +161,66 @@
            "HEAD" "TAIL"
            "PREPEND" "APPEND"
            "POPL" "POPR"
-           "JOIN" "LINK"
+           "JOIN" "LINK" "BREAK"
            "PRINT"))
+;; terminology
+;; 'left' and 'right' links - equivalent to 'prev' and 'next' links
+;; 'well-formed' deque - a deque where for all elements A and B, either:
+;;   - the prev link of A is B and the next link of B is A
+;;   - the next link of A is B and the prev link of B is A
+;;   - both of the above
+;;   - A and B are not linked to each other
+;; 'cyclic' deque - a deque where for all elements A,
+;;   repeated application of PREV or NEXT returns A
+;;
+;; warning: deques must be printed via DEQUE:PRINT as the pretty-printer
+;; does not handle doubly-linked structures well
 (defun deque:cons (x) (vector nil x nil))
 (defun deque::is-deque (d) (and d (typep d 'vector) (= (length d) 3)))
 (defun deque:prev (d) (when (and (deque::is-deque d) (svref d 0)) (svref d 0)))
 (defun deque:get (d) (when (deque::is-deque d) (svref d 1)))
 (defun deque:next (d) (when (and (deque::is-deque d) (svref d 2)) (svref d 2)))
-(defun deque:head (d) (if (deque:prev d) (deque:head (deque:prev d)) d))
-(defun deque:tail (d) (if (deque:next d) (deque:tail (deque:next d)) d))
-(defun deque:prepend (d x) (let-1 c (deque:cons x) (vset d c 0) (vset c d 2)))
-(defun deque:append (d x) (let-1 c (deque:cons x) (vset d c 2) (vset c d 0)))
-(defun deque:popl (d) (let-1 c (deque:head d) (vset d nil 0) (deque:get c)))
-(defun deque:popr (d) (let-1 c (deque:tail d) (vset d nil 2) (deque:get c)))
+(defun deque:head (d)
+  ;; warning: does not handle cyclic deques
+  (if (deque:prev d) (deque:head (deque:prev d)) d))
+(defun deque:tail (d)
+  ;; warning: does not handle cyclic deques
+  (if (deque:next d) (deque:tail (deque:next d)) d))
+(defun deque:prepend (d x)
+  (let-n (c d) ((deque:cons x) (deque:head d)) (vset d c 0) (vset c d 2)))
+(defun deque:append (d x)
+  (let-n (c d) ((deque:cons x) (deque:tail d)) (vset d c 2) (vset c d 0)))
+(defun deque:popl (d)
+  (let-1 c (deque:head d)
+    (vset (deque:next c) nil 0) (vset c nil 2) (deque:get c)))
+(defun deque:popr (d)
+  (let-1 c (deque:tail d)
+    (vset (deque:prev c) nil 2) (vset c nil 0) (deque:get c)))
 (defun deque:join (d1 d2)
+  ;; warning: can create cyclic deques
   (let-n (left right) ((deque:tail d1) (deque:head d2))
     (vset left right 2)
     (vset right left 0)))
-(defun deque:link (d1 d2) (vset d1 d2 2) (vset d2 d1 0))
-(defun deque:print (d)
-  (do ((d_ (deque:head d) (deque:next d_))
-       (out "#<deque" (format nil "~a ~s" out (deque:get d_))))
-      ((null d_) (concatenate 'string out ">"))))
+(defun deque:link (d1 d2)
+  ;; warning: can create cyclic deques
+  (vset d1 d2 2) (vset d2 d1 0))
+(defun deque:break (d &optional (left nil))
+  ;; warning: requires break point to be between elements;
+  ;; breaking at head-prev or tail-next will fail
+  (if left
+      (let-1 o (deque:prev d)
+        (vset o nil 2) (vset d nil 0)
+        (cons o d))
+      (let-1 o (deque:next d)
+        (vset o nil 0) (vset d nil 2)
+        (cons d o))))
+(defun deque:print (d_)
+  (do ((d (deque:head d_) (deque:next d))
+       (out "#<deque" (format nil "~a ~:[~s~;~*~a~]" out
+                              (deque::is-deque (deque:get d))
+                              (deque:get d)
+                              (deque:print (deque:get d)))))
+      ((null d) (concatenate 'string out ">"))))
 
 (defpackage "BOARD"
   (:export "CREATE"
