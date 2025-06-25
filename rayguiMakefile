@@ -1,17 +1,13 @@
-
-
 CC = gcc
 AR = ar
-CFLAGS = -O2 -Wall -std=c99 -fPIC -I. -I../raylib/src
+CFLAGS = -O2 -Wall -std=c99 -fPIC -I. -I../../raylib/src
 LIBS = -lraylib -lGL -lm -lpthread -ldl -lrt -lX11
-
 
 HEADER = raygui.h
 IMPL = raygui.c
 TARGET = raygui.so
 
-
-DESTDIR = /usr
+DESTDIR = $(HOME)/.local
 INCLUDEDIR = $(DESTDIR)/include
 LIBDIR = $(DESTDIR)/lib
 BINDIR = $(DESTDIR)/bin
@@ -21,7 +17,7 @@ BINDIR = $(DESTDIR)/bin
 
 install:
 	cp $(HEADER) $(IMPL)
-	$(CC) -o $(TARGET) $(IMPL) -shared -fpic -DRAYGUI_IMPLEMENTATION -lraylib -lGL -lm -lpthread -ldl -lrt -lX11
+	$(CC) -o $(TARGET) $(IMPL) -shared -fpic -DRAYGUI_IMPLEMENTATION $(CFLAGS)
 	install -Dm644 $(TARGET) $(LIBDIR)/$(TARGET)
 	install -Dm644 $(HEADER) $(LIBDIR)/$(HEADER)
 	install -Dm644 $(HEADER) $(INCLUDEDIR)/$(HEADER)

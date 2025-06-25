@@ -6,7 +6,7 @@
       (path (merge-pathnames #P"lib/" (asdf:component-pathname (asdf:find-system '#:claw-raylib)))))
   (dolist (lib '("raylib" "rlgl" "raygui"))
     (uiop:run-program
-     (list "gcc" "-O3" "-fPIC" "-shared" "-o"
-           (namestring (merge-pathnames (format nil "lib~A-adapter.so" lib) path))
+     (list "gcc" "-O3" "-fPIC" "-shared" "-Iraylib/src" "-Iraygui/src"
+           "-o" (namestring (merge-pathnames (format nil "lib~A-adapter.so" lib) path))
            (namestring (merge-pathnames (format nil "lib~A-adapter.~A.c" lib arch) path))))))
     
