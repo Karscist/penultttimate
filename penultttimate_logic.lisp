@@ -93,7 +93,11 @@
 ;; should be a struct or something but i'm a cons addict and never
 ;; bothered to learn how to make data structures with any other tools
 (defpackage "POINT"
-  (:export "POINT" "DUP" "X" "Y" "SETX" "SETY" "+"))
+  (:export "POINT"
+           "DUP"
+           "X" "Y"
+           "SETX" "SETY"
+           "+"))
 (defun point:point (x y) (cons x y))
 (defun point:dup (p) (cons (car p) (cdr p)))
 (defun point:x (p) (car p))
@@ -151,8 +155,41 @@
                         (setq row (cons (aref a x y) row)))
                       out)))))
 
+(defpackage "DEQUE"
+  (:export "CONS"
+           "PREV" "GET" "NEXT"
+           "HEAD" "TAIL"
+           "PREPEND" "APPEND"
+           "POPL" "POPR"
+           "JOIN" "LINK"
+           "PRINT"))
+(defun deque:cons (x) (vector nil x nil))
+(defun deque::is-deque (d) (and d (typep d 'vector) (= (length d) 3)))
+(defun deque:prev (d) (when (and (deque::is-deque d) (svref d 0)) (svref d 0)))
+(defun deque:get (d) (when (deque::is-deque d) (svref d 1)))
+(defun deque:next (d) (when (and (deque::is-deque d) (svref d 2)) (svref d 2)))
+(defun deque:head (d) (if (deque:prev d) (deque:head (deque:prev d)) d))
+(defun deque:tail (d) (if (deque:next d) (deque:tail (deque:next d)) d))
+(defun deque:prepend (d x) (let-1 c (deque:cons x) (vset d c 0) (vset c d 2)))
+(defun deque:append (d x) (let-1 c (deque:cons x) (vset d c 2) (vset c d 0)))
+(defun deque:popl (d) (let-1 c (deque:head d) (vset d nil 0) (deque:get c)))
+(defun deque:popr (d) (let-1 c (deque:tail d) (vset d nil 2) (deque:get c)))
+(defun deque:join (d1 d2)
+  (let-n (left right) ((deque:tail d1) (deque:head d2))
+    (vset left right 2)
+    (vset right left 0)))
+(defun deque:link (d1 d2) (vset d1 d2 2) (vset d2 d1 0))
+(defun deque:print (d)
+  (do ((d_ (deque:head d) (deque:next d_))
+       (out "#<deque" (format nil "~a ~s" out (deque:get d_))))
+      ((null d_) (concatenate 'string out ">"))))
+
 (defpackage "BOARD"
-  (:export "CREATE" "GET" "SET" "PRINT" "EMPTYP" "FULLP" "CHECK-AT-POINT"))
+  (:export "CREATE"
+           "GET" "SET"
+           "PRINT"
+           "EMPTYP" "FULLP"
+           "CHECK-AT-POINT"))
 (defun board:create (width height)
   (make-array (list width height) :initial-element -1))
 (defun board:get (board p) (aref board (point:x p) (point:y p)))
