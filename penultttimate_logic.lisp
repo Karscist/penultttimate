@@ -20,6 +20,26 @@
    `(funcall ,@(let ((x (read stream t nil t)))
                  (if (or (atom x) (eq 'funcall (car x))) (list x) x)))))
 
+(set-macro-character
+ #\λ
+ (lambda (stream _)
+   (declare (ignore _))
+   (let ((args nil) (c nil))
+     (block nil
+       (tagbody
+        getchar
+          (setq c (read-char stream t nil t))
+          (if (eql c #\()
+              (progn
+                (unread-char c stream)
+                (setq args (nreverse args))
+                (return))
+              (progn
+                (setq args (cons (intern (string-upcase (string c))) args))
+                (go getchar)))))
+     (let ((x (read stream t nil t)))
+       `(lambda ,args ,@(if (eq 'progn (car x)) (cdr x) (list x)))))))
+
 (defun id (x) x)
 (defun const (x) (lambda (_) (declare (ignore _)) x))
 (defun duplist (l) (mapcar (lambda (x) (if (typep x 'list) (duplist x) x)) l))
