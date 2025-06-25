@@ -246,9 +246,9 @@
 	  ((loop
 	     (let-n (x y) ((get-var (format nil "~a's x position" (player-id>icon player)))
 			   (get-var (format nil "~a's y position" (player-id>icon player))))
-	       (when (and (<x< -1 (deref x) width)
-			  (<x< -1 (deref y) height)
-			  (> 0 (board:get board (point (deref x) (deref y)))))
+	       (when (and (<x< -1 x width)
+			  (<x< -1 y height)
+			  (> 0 (board:get board (point x y))))
 		 (return (point x y)))
 	       (format t "that position is not available, try again~%"))))
        (board:set board point player)
