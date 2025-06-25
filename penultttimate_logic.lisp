@@ -241,8 +241,6 @@
 (defun board:fullp (board)
   (array-foldr (lambda (x acc) (if (> 0 x) nil acc)) t board))
 
-(defun <x< (min x max) (and (> x min) (< x max)))
-
 (defun board:check-at-point (board width height point win-len)
   (let-1 piece (board:get board point)
     (let-1 l
@@ -253,8 +251,8 @@
                   (tr (lambda (pt) (point:+ pt offset)))
                   (c 0))
               (loop-until
-               (or (not (and (<x< -1 (point:x p) width)
-                             (<x< -1 (point:y p) height)))
+               (or (not (and (< -1 (point:x p) width)
+                             (< -1 (point:y p) height)))
                    (not (eql (board:get board p) piece))
                    (= c win-len))
                c
@@ -280,15 +278,18 @@
          (turn 0))
     (loop
      (format t "~a" (board:print board))
-      (let-n (point)
-	  ((loop
-	     (let-n (x y) ((get-var (format nil "~a's x position" (player-id>icon player)))
-			   (get-var (format nil "~a's y position" (player-id>icon player))))
-	       (when (and (<x< -1 x width)
-			  (<x< -1 y height)
-			  (> 0 (board:get board (point x y))))
-		 (return (point x y)))
-	       (format t "that position is not available, try again~%"))))
+     (let-n (point)
+	 ((loop
+	   (let-n (x y)
+               ((get-var (format nil "~a's x position"
+                                 (player-id>icon player)))
+		(get-var (format nil "~a's y position"
+                                 (player-id>icon player))))
+	     (when (and (< -1 x width)
+			(< -1 y height)
+			(> 0 (board:get board (point x y))))
+	       (return (point x y)))
+	     (format t "that position is not available, try again~%"))))
        (board:set board point player)
        (when (board:check-at-point
               board width height
