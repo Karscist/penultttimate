@@ -24,39 +24,76 @@
  #\λ
  (lambda (stream _)
    (declare (ignore _))
-   (let ((args nil) (c nil) (l nil))
+   (let ((args nil) (c nil) (l nil) (ignored 0) (ign-args nil) (rest nil))
      (block nil
        (tagbody
         getchar
           (setq c (read-char stream t nil t))
-          (if
-           (eql c #\()
-           (progn
-             (unread-char c stream)
+          (cond
+            ((or (eql c #\space) (eql c #\newline)) (go getchar))
+            ((or (eql c #\() (eql c #\.))
+             (when (eql c #\() (unread-char c stream))
              (setq args (nreverse args))
              (return))
-           (if
-            (eql c #\[)
-            (tagbody
-             nextchar
-               (setq c (read-char stream t nil t))
-               (if
-                (and (eql c #\]) l)
-                (progn
-                  (setq
-                   args
-                   (cons (intern (string-upcase (coerce (nreverse l) 'string)))
-                         args))
-                  (setq l nil)
-                  (go getchar))
-                (progn
-                  (setq l (cons c l))
-                  (go nextchar))))
-            (progn
-              (setq args (cons (intern (string-upcase (string c))) args))
-              (go getchar))))))
+            ((eql c #\[)
+             (tagbody
+              nextchar
+                (setq c (read-char stream t nil t))
+                (if
+                 (and (eql c #\]) l)
+                 (progn
+                   (setq
+                    args
+                    (cons (intern (string-upcase (coerce (nreverse l) 'string)))
+                          args))
+                   (setq l nil)
+                   (go getchar))
+                 (progn
+                   (setq l (cons c l))
+                   (go nextchar)))))
+            ((eql c #\_)
+             (let ((x (intern (format nil "_~a" ignored))))
+               (setq args (cons x args))
+               (setq ign-args (cons x ign-args)))
+             (setq ignored (+ 1 ignored))
+             (go getchar))
+            ((eql c #\*)
+             (tagbody
+              nextchar
+                (setq c (read-char stream t nil t))
+                (cond
+                  ((eql c #\()
+                   (unread-char c stream)
+                   (go end))
+                  ((eql c #\.) (go end))
+                  ((and (null rest) (eql c #\_))
+                   (setq ign-args (cons '_rest ign-args))
+                   (setq rest '(#\t #\s #\e #\r #\_))
+                   (setq c (read-char stream t nil t))
+                   (unless (eql c #\.) (unread-char c stream))
+                   (go end))
+                  (t (setq rest (cons c rest))
+                     (go nextchar)))
+              end
+                (when rest
+                  (setq rest
+                        (intern
+                         (string-upcase (coerce (nreverse rest) 'string))))
+                  (setq args (cons rest (cons '&rest args)))
+                  (setq args (nreverse args)))))
+            (t
+             (progn
+               (setq args (cons (intern (string-upcase (string c))) args))
+               (go getchar))))))
      (let ((x (read stream t nil t)))
-       `(lambda ,args ,@(if (eq 'progn (car x)) (cdr x) (list x)))))))
+       (if (and (typep x 'list) (eq 'progn (car x)))
+           (setq x (cdr x)) (setq x (list x)))
+       (when ign-args (setq x (cons `(declare (ignore ,@ign-args)) x)))
+       `(lambda ,args ,@x)))))
+
+;; let mods
+(defmacro let-1 (sym val &body body) `(let ((,sym ,val)) ,@body))
+(defmacro let-n (syms vals &body body) `(let ,(mapcar #'list syms vals) ,@body))
 
 (defun id (x) x)
 (defun const (x) (lambda (_) (declare (ignore _)) x))
@@ -84,11 +121,20 @@
      ,@(mapcar λx(list (list eq val (car x)) (cadr x)) body)
      (t ,def)))
 
-(defmacro mapcar^2 (f l) `(mapcar λ[l2](mapcar ,f l2) ,l))
+(defun mapcar-until (f def list)
+  (if list
+      (let-1 x #*(f (car list))
+             (if (cdr x)
+                 (car x)
+                 (mapcar-until f def (cdr list))))
+      def))
+(defun match-alist (val eq def alist)
+  (mapcar-until
+   λx(if #*(eq val (car x)) (cons (cdr x) t) '(()))
+   def
+   alist))
 
-;; let mods
-(defmacro let-1 (sym val &body body) `(let ((,sym ,val)) ,@body))
-(defmacro let-n (syms vals &body body) `(let ,(mapcar #'list syms vals) ,@body))
+(defmacro mapcar^2 (f l) `(mapcar λ[l2](mapcar ,f l2) ,l))
 
 ;; LOOP as it should be: an indefinite loop
 (defmacro loop (&body body)
@@ -99,6 +145,18 @@
   `(loop (when ,cond (return ,ret)) ,@body))
 (defmacro loop-while (cond ret &body body)
   `(loop (unless ,cond (return ,ret)) ,@body))
+
+;; warning: currently not usable for actual useful objects
+(defun make-simple-object (messages data)
+  (let-1 o λ[ms]d.
+    λ[self].
+    λm*args.
+    (apply (match-alist
+            m #'eq nil
+            (mapcar λx(cons (car x) #*((cdr x) self d)) ms))
+           args)
+    (let-1 out #*(o messages data)
+           #*(out #*(out out))))) ; this last bit feels like a hack
 
 ;; i like stacks :3
 (defparameter *stack* nil)
