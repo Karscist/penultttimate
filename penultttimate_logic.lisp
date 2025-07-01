@@ -146,17 +146,19 @@
 (defmacro loop-while (cond ret &body body)
   `(loop (unless ,cond (return ,ret)) ,@body))
 
-;; warning: currently not usable for actual useful objects
-(defun make-simple-object (messages data)
-  (let-1 o λ[ms]d.
+(defun make-simple-object-f (messages data)
+  (let-1 o
     λ[self].
     λm*args.
     (apply (match-alist
             m #'eq nil
-            (mapcar λx(cons (car x) #*((cdr x) self d)) ms))
+            (mapcar λx(cons (car x) #*((cdr x) #*(self self) data)) messages))
            args)
-    (let-1 out #*(o messages data)
-           #*(out #*(out out))))) ; this last bit feels like a hack
+    #*(o o)))
+(defmacro make-simple-object (data &body messages)
+  `(make-simple-object-f
+    (list ,@(mapcar λx.`(cons ',(car x) ,(cadr x)) messages))
+    ,data))
 
 ;; i like stacks :3
 (defparameter *stack* nil)
@@ -186,23 +188,14 @@
   (let-1 input (read-line)
     (unless (equal input "") (setref ref (read-from-string input)))))
 
-;; should be a struct or something but i'm a cons addict and never
-;; bothered to learn how to make data structures with any other tools
-(defpackage "POINT"
-  (:export "POINT"
-           "DUP"
-           "X" "Y"
-           "SETX" "SETY"
-           "+"))
-(defun point:point (x y) (cons x y))
-(defun point:dup (p) (cons (car p) (cdr p)))
-(defun point:x (p) (car p))
-(defun point:y (p) (cdr p))
-(defun point:setx (p x) (rplaca p x))
-(defun point:sety (p y) (rplacd p y))
-(defun point:+ (p o)
-  (point:point (+ (point:x p) (point:x o)) (+ (point:y p) (point:y o))))
-(defun point (x y) (point:point x y)) ;; convenience function
+(defun point (x y)
+  (make-simple-object (cons x y)
+    (dup λ__.λ(point x y))
+    (x λ_d.λ(car d))
+    (y λ_d.λ(cdr d))
+    (setx λsd.λx(progn (rplaca d x) s))
+    (sety λsd.λx(progn (rplacd d x) s))
+    (+ λs_.λo(point (+ #*(s 'x) #*(o 'x)) (+ #*(s 'y) #*(o 'y))))))
 
 (defun player-id>icon (id)
   (match id eql " "
@@ -251,129 +244,95 @@
                         (setq row (cons (aref a x y) row)))
                       out)))))
 
-(defpackage "DEQUE"
-  (:export "CONS"
-           "PREV" "GET" "NEXT"
-           "HEAD" "TAIL"
-           "PREPEND" "APPEND"
-           "POPL" "POPR"
-           "JOIN" "LINK" "BREAK"
-           "PRINT"))
-;; terminology
-;; 'left' and 'right' links - equivalent to 'prev' and 'next' links
-;; 'well-formed' deque - a deque where for all elements A and B, either:
-;;   - the prev link of A is B and the next link of B is A
-;;   - the next link of A is B and the prev link of B is A
-;;   - both of the above
-;;   - A and B are not linked to each other
-;; 'cyclic' deque - a deque where for all elements A,
-;;   repeated application of PREV or NEXT returns A
-;;
-;; warning: deques must be printed via DEQUE:PRINT as the pretty-printer
-;; does not handle doubly-linked structures well
-(defun deque:cons (x) (vector nil x nil))
-(defun deque::is-deque (d) (and d (typep d 'vector) (= (length d) 3)))
-(defun deque:prev (d) (when (and (deque::is-deque d) (svref d 0)) (svref d 0)))
-(defun deque:get (d) (when (deque::is-deque d) (svref d 1)))
-(defun deque:next (d) (when (and (deque::is-deque d) (svref d 2)) (svref d 2)))
-(defun deque:head (d)
-  ;; warning: does not handle cyclic deques
-  (if (deque:prev d) (deque:head (deque:prev d)) d))
-(defun deque:tail (d)
-  ;; warning: does not handle cyclic deques
-  (if (deque:next d) (deque:tail (deque:next d)) d))
-(defun deque:prepend (d x)
-  (let-n (c d) ((deque:cons x) (deque:head d)) (vset d c 0) (vset c d 2)))
-(defun deque:append (d x)
-  (let-n (c d) ((deque:cons x) (deque:tail d)) (vset d c 2) (vset c d 0)))
-(defun deque:popl (d)
-  (let-1 c (deque:head d)
-    (vset (deque:next c) nil 0) (vset c nil 2) (deque:get c)))
-(defun deque:popr (d)
-  (let-1 c (deque:tail d)
-    (vset (deque:prev c) nil 2) (vset c nil 0) (deque:get c)))
-(defun deque:join (d1 d2)
-  ;; warning: can create cyclic deques
-  (let-n (left right) ((deque:tail d1) (deque:head d2))
-    (vset left right 2)
-    (vset right left 0)))
-(defun deque:link (d1 d2)
-  ;; warning: can create cyclic deques
-  (vset d1 d2 2) (vset d2 d1 0))
-(defun deque:break (d &optional (left nil))
-  ;; warning: requires break point to be between elements;
-  ;; breaking at head-prev or tail-next will fail
-  (if left
-      (let-1 o (deque:prev d)
-        (vset o nil 2) (vset d nil 0)
-        (cons o d))
-      (let-1 o (deque:next d)
-        (vset o nil 0) (vset d nil 2)
-        (cons d o))))
-(defun deque:print (d_)
-  (do ((d (deque:head d_) (deque:next d))
-       (out "#<deque" (format nil "~a ~:[~s~;~*~a~]" out
-                              (deque::is-deque (deque:get d))
-                              (deque:get d)
-                              (deque:print (deque:get d)))))
-      ((null d) (concatenate 'string out ">"))))
+(defun deque (x)
+  (make-simple-object (vector nil x nil)
+    (object λ__.λm*_(when (eq m 'type) 'deque))
+    (private λ_d.λm*args(match m eq nil
+                          ('setprev (vset d (car args) 0))
+                          ('setnext (vset d (car args) 2))))
+    (get λ_d.λ(svref d 1))
+    (set λsd.λx(progn (vset d x 1) s))
+    (prev λ_d.λ(svref d 0))
+    (next λ_d.λ(svref d 2))
+    (head λs_.λ(if #*(s 'prev) #*(#*(s 'prev) 'head) s))
+    (tail λs_.λ(if #*(s 'next) #*(#*(s 'next) 'tail) s))
+    (prepend λs_.λx(let-n (c h) ((deque x) #*(s 'head))
+                     #*(h 'private 'setprev c)
+                     #*(c 'private 'setnext h)
+                     c))
+    (append λs_.λx(let-n (c tl) ((deque x) #*(s 'tail))
+                    #*(tl 'private 'setnext c)
+                    #*(c 'private 'setprev tl)
+                    c))
+    (popl λs_.λ(let-1 h #*(s 'head)
+                      (let-1 n #*(h 'next)
+                             #*(n 'private 'setprev nil)
+                             #*(h 'private 'setnext nil)
+                             (values h n))))
+    (popr λs_.λ(let-1 tl #*(s 'tail)
+                      (let-1 p #*(tl 'prev)
+                             #*(p 'private 'setnext nil)
+                             #*(tl 'private 'setprev nil)
+                             (values tl p))))
+    (print λs_.λ
+           (do ((q #*(s 'head) #*(q 'next))
+                (out "#<deque"
+                     (let-1 is-deque
+                         (and (typep #*(q 'get) 'function)
+                              (ignore-errors
+                                (eq 'deque #*(#*(q 'get) 'object 'type))))
+                       (format nil "~a ~:[~s~;~*~a~]" out
+                               is-deque
+                               #*(q 'get)
+                               (when is-deque #*(#*(q 'get) 'print))))))
+               ((null q) (concatenate 'string out ">"))))))
 
-(defpackage "BOARD"
-  (:export "CREATE"
-           "GET" "SET"
-           "PRINT"
-           "EMPTYP" "FULLP"
-           "CHECK-AT-POINT"))
-(defun board:create (width height)
-  (make-array (list width height) :initial-element -1))
-(defun board:get (board p) (aref board (point:x p) (point:y p)))
-(defun board:set (board p val)
-  (setf (aref board (point:x p) (point:y p)) val))
-(defun board:print (board)
-  (format nil "~{~{ ~a ~^│~}~%~^~:*~{~*───~^┼~}~%~}"
-          (array-2d>list (array-map-2d #'player-id>icon board))))
-(defun board:emptyp (board)
-  (array-foldr λx[acc](if (> 0 x) acc nil) t board))
-(defun board:fullp (board)
-  (array-foldr λx[acc](if (> 0 x) nil acc) t board))
-
-(defun board:check-at-point (board width height point win-len)
-  (let-1 piece (board:get board point)
-    (let-1 l
-        (split-list
-         (mapcar
-          (lambda (offset)
-            (let ((p (point:dup point))
-                  (tr (lambda (pt) (point:+ pt offset)))
-                  (c 0))
-              (loop-until
-               (or (not (and (< -1 (point:x p) width)
-                             (< -1 (point:y p) height)))
-                   (not (eql (board:get board p) piece))
-                   (= c win-len))
-               c
-               (setq p (f tr p))
-               (setq c (+ 1 c)))))
-          (list (point -1 0) (point 1 0)
-                (point 0 -1) (point 0 1)
-                (point -1 -1) (point 1 1)
-                (point 1 -1) (point -1 1))))
-      (when (car
-             (remove-if
-              #'null
-              (mapcar λab(> (+ a b) win-len) (car l) (cdr l))))
-        piece))))
+(defun make-board (width height)
+  (make-simple-object
+      (make-array (list width height) :initial-element -1)
+    (get λ_d.λp(aref d #*(p 'x) #*(p 'y)))
+    (set λsd.λpx(progn (aset d x #*(p 'x) #*(p 'y)) s))
+    (empty? λ_d.λ(array-foldr λx[acc](if (> 0 x) acc nil) t d))
+    (full? λ_d.λ(array-foldr λx[acc](if (> 0 x) nil acc) t d))
+    (print λ_d.λ(format nil "~{~{ ~a ~^│~}~%~^~:*~{~*───~^┼~}~%~}"
+                        (array-2d>list (array-map-2d #'player-id>icon d))))
+    (check λs_.λp[win-len]
+           (let-1 piece #*(s 'get p)
+             (let-1 l
+                 (split-list
+                  (mapcar
+                   (lambda (offset)
+                     (let ((p #*(p 'dup))
+                           (tr (lambda (pt) #*(pt '+ offset)))
+                           (c 0))
+                       (loop-until
+                        (or (not (and (< -1 #*(p 'x) width)
+                                      (< -1 #*(p 'y) height)))
+                            (not (eql #*(s 'get p) piece))
+                            (= c win-len))
+                        c
+                        (setq p (f tr p))
+                        (setq c (+ 1 c)))))
+                   (list (point -1 0) (point 1 0)
+                         (point 0 -1) (point 0 1)
+                         (point -1 -1) (point 1 1)
+                         (point 1 -1) (point -1 1))))
+               (when (car
+                      (remove-if
+                       #'null
+                       (mapcar λab(> (+ a b) win-len) (car l) (cdr l))))
+                 piece))))))
 
 (defun game ()
   (let* ((width (get-var-optional 3 "board width"))
          (height (get-var-optional 3 "board height"))
          (win-len (get-var-optional 3 "winning path length"))
          (players (get-var-optional 2 "player count"))
-         (board (board:create width height))
+         (board (make-board width height))
          (player 0)
          (turn 0))
     (loop
-     (format t "~a" (board:print board))
+     (format t "~a" #*(board 'print))
      (let-n (point)
 	 ((loop
 	   (let-n (x y)
@@ -383,20 +342,17 @@
                                  (player-id>icon player))))
 	     (when (and (< -1 x width)
 			(< -1 y height)
-			(> 0 (board:get board (point x y))))
+			(> 0 #*(board 'get (point x y))))
 	       (return (point x y)))
 	     (format t "that position is not available, try again~%"))))
-       (board:set board point player)
-       (when (board:check-at-point
-              board width height
-              point
-              win-len)
-         (return (format t "~a~a won!~%turns taken: ~a"
-                         (board:print board)
-                         (player-id>icon player)
-                         (+ 1 turn)))))
-     (when (board:fullp board)
-       (return (format t "~agame was a tie!" (board:print board))))
+       #*(board 'set point player)
+       (when #*(board 'check point win-len)
+             (return (format t "~a~a won!~%turns taken: ~a"
+                             #*(board 'print)
+                             (player-id>icon player)
+                             (+ 1 turn)))))
+     (when #*(board 'full?)
+           (return (format t "~agame was a tie!" #*(board 'print))))
      (setq player (+ 1 player))
      (when (= player players) (setq player 0))
      (setq turn (+ 1 turn)))))
