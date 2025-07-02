@@ -146,7 +146,38 @@
 (defmacro loop-while (cond ret &body body)
   `(loop (unless ,cond (return ,ret)) ,@body))
 
-(defun make-simple-object-f (messages data)
+;; use an alist as a binding environment
+(defun geta (alist sym)
+  (when alist
+    (if (eq (caar alist) sym)
+        (cdar alist)
+        (geta (cdr alist) sym))))
+(defun seta (alist sym val)
+  (if (car alist)
+    (if (eq (caar alist) sym)
+        (rplacd (car alist) val)
+        (seta (cdr alist) sym val))
+    (rplacd alist (cons (cons sym val) nil))))
+(defparameter *env* (list nil))
+(defmacro gete (sym) `(geta *env* ',sym))
+(defmacro sete (sym val) `(seta *env* ',sym ,val))
+(defmacro with-env (&body body) `(let-1 *env* (list nil) ,@body))
+
+(defun make-simple-object-f (messages)
+  (let-1 o
+    λ[self].
+    λm*args.
+    (apply (match-alist
+            m #'eq nil
+            (mapcar λx(cons (car x) #*((cdr x) #*(self self))) messages))
+           args)
+    #*(o o)))
+(defmacro make-simple-object (&body messages)
+  `(with-env
+       (make-simple-object-f
+        (list ,@(mapcar λx.`(cons ',(car x) ,(cadr x)) messages)))))
+
+(defun make-simple-object-data-f (messages data)
   (let-1 o
     λ[self].
     λm*args.
@@ -155,8 +186,8 @@
             (mapcar λx(cons (car x) #*((cdr x) #*(self self) data)) messages))
            args)
     #*(o o)))
-(defmacro make-simple-object (data &body messages)
-  `(make-simple-object-f
+(defmacro make-simple-object-data (data &body messages)
+  `(make-simple-object-data-f
     (list ,@(mapcar λx.`(cons ',(car x) ,(cadr x)) messages))
     ,data))
 
@@ -189,7 +220,7 @@
     (unless (equal input "") (setref ref (read-from-string input)))))
 
 (defun point (x y)
-  (make-simple-object (cons x y)
+  (make-simple-object-data (cons x y)
     (dup λ__.λ(point x y))
     (x λ_d.λ(car d))
     (y λ_d.λ(cdr d))
@@ -245,7 +276,7 @@
                       out)))))
 
 (defun deque (x)
-  (make-simple-object (vector nil x nil)
+  (make-simple-object-data (vector nil x nil)
     (object λ__.λm*_(when (eq m 'type) 'deque))
     (private λ_d.λm*args(match m eq nil
                           ('setprev (vset d (car args) 0))
@@ -287,16 +318,20 @@
                                (when is-deque #*(#*(q 'get) 'print))))))
                ((null q) (concatenate 'string out ">"))))))
 
-(defun make-board (width height)
+(defun make-board (width height &optional (inner -1))
   (make-simple-object
-      (make-array (list width height) :initial-element -1)
-    (get λ_d.λp(aref d #*(p 'x) #*(p 'y)))
-    (set λsd.λpx(progn (aset d x #*(p 'x) #*(p 'y)) s))
-    (empty? λ_d.λ(array-foldr λx[acc](if (> 0 x) acc nil) t d))
-    (full? λ_d.λ(array-foldr λx[acc](if (> 0 x) nil acc) t d))
-    (print λ_d.λ(format nil "~{~{ ~a ~^│~}~%~^~:*~{~*───~^┼~}~%~}"
-                        (array-2d>list (array-map-2d #'player-id>icon d))))
-    (check λs_.λp[win-len]
+    (init λs.λ(progn
+                (sete board
+                      (make-array (list width height) :initial-element inner))
+                s))
+    (get λ_.λp(aref (gete board) #*(p 'x) #*(p 'y)))
+    (set λs.λpx(progn (aset (gete board) x #*(p 'x) #*(p 'y)) s))
+    (empty? λ_.λ(array-foldr λx[acc](if (> 0 x) acc nil) t (gete board)))
+    (full? λ_.λ(array-foldr λx[acc](if (> 0 x) nil acc) t (gete board)))
+    (print
+     λ_.λ(format nil "~{~{ ~a ~^│~}~%~^~:*~{~*───~^┼~}~%~}"
+                 (array-2d>list (array-map-2d #'player-id>icon (gete board)))))
+    (check λs.λp[win-len]
            (let-1 piece #*(s 'get p)
              (let-1 l
                  (split-list
@@ -328,7 +363,7 @@
          (height (get-var-optional 3 "board height"))
          (win-len (get-var-optional 3 "winning path length"))
          (players (get-var-optional 2 "player count"))
-         (board (make-board width height))
+         (board #*((make-board width height) 'init))
          (player 0)
          (turn 0))
     (loop
