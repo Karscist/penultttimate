@@ -319,51 +319,54 @@
                ((null q) (concatenate 'string out ">"))))))
 
 (defun make-board (width height &optional (inner -1))
-  (make-simple-object
-    (init λs.λ(progn
-                (sete board
-                      (make-array (list width height) :initial-element inner))
-                s))
-    (get λ_.λp(aref (gete board) #*(p 'x) #*(p 'y)))
-    (set λs.λpx(progn (aset (gete board) x #*(p 'x) #*(p 'y)) s))
-    (empty? λ_.λ(array-foldr λx[acc](if (> 0 x) acc nil) t (gete board)))
-    (full? λ_.λ(array-foldr λx[acc](if (> 0 x) nil acc) t (gete board)))
-    (print
-     λ_.λ(format nil "~{~{ ~a ~^│~}~%~^~:*~{~*───~^┼~}~%~}"
-                 (array-2d>list (array-map-2d #'player-id>icon (gete board)))))
-    (check λs.λp[win-len]
-           (let-1 piece #*(s 'get p)
-             (let-1 l
-                 (split-list
-                  (mapcar
-                   (lambda (offset)
-                     (let ((p #*(p 'dup))
-                           (tr (lambda (pt) #*(pt '+ offset)))
-                           (c 0))
-                       (loop-until
-                        (or (not (and (< -1 #*(p 'x) width)
-                                      (< -1 #*(p 'y) height)))
-                            (not (eql #*(s 'get p) piece))
-                            (= c win-len))
-                        c
-                        (setq p (f tr p))
-                        (setq c (+ 1 c)))))
-                   (list (point -1 0) (point 1 0)
-                         (point 0 -1) (point 0 1)
-                         (point -1 -1) (point 1 1)
-                         (point 1 -1) (point -1 1))))
-               (when (car
-                      (remove-if
-                       #'null
-                       (mapcar λab(> (+ a b) win-len) (car l) (cdr l))))
-                 piece))))))
+  #*((make-simple-object
+       (init
+        λs.λ(progn
+              (sete board
+                    (make-array (list width height) :initial-element inner))
+              s))
+       (get λ_.λp(aref (gete board) #*(p 'x) #*(p 'y)))
+       (set λs.λpx(progn (aset (gete board) x #*(p 'x) #*(p 'y)) s))
+       (empty? λ_.λ(array-foldr λx[acc](if (> 0 x) acc nil) t (gete board)))
+       (full? λ_.λ(array-foldr λx[acc](if (> 0 x) nil acc) t (gete board)))
+       (print
+        λ_.λ(format nil "~{~{ ~a ~^│~}~%~^~:*~{~*───~^┼~}~%~}"
+                    (array-2d>list
+                     (array-map-2d #'player-id>icon (gete board)))))
+       (check λs.λp[win-len]
+              (let-1 piece #*(s 'get p)
+                     (let-1 l
+                         (split-list
+                          (mapcar
+                           (lambda (offset)
+                             (let ((p #*(p 'dup))
+                                   (tr (lambda (pt) #*(pt '+ offset)))
+                                   (c 0))
+                               (loop-until
+                                (or (not (and (< -1 #*(p 'x) width)
+                                              (< -1 #*(p 'y) height)))
+                                    (not (eql #*(s 'get p) piece))
+                                    (= c win-len))
+                                c
+                                (setq p (f tr p))
+                                (setq c (+ 1 c)))))
+                           (list (point -1 0) (point 1 0)
+                                 (point 0 -1) (point 0 1)
+                                 (point -1 -1) (point 1 1)
+                                 (point 1 -1) (point -1 1))))
+                       (when (car
+                              (remove-if
+                               #'null
+                               (mapcar λab(> (+ a b) win-len) (car l) (cdr l))))
+                         piece)))))
+     'init))
 
 (defun game ()
   (let* ((width (get-var-optional 3 "board width"))
          (height (get-var-optional 3 "board height"))
          (win-len (get-var-optional 3 "winning path length"))
          (players (get-var-optional 2 "player count"))
-         (board #*((make-board width height) 'init))
+         (board (make-board width height))
          (player 0)
          (turn 0))
     (loop
