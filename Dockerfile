@@ -49,6 +49,13 @@ RUN git clone --recursive --depth=1 \
               https://github.com/Karscist/penultttimate \
               /root/common-lisp/penultttimate
 
-# make it
+# make
 RUN make --directory=/root/common-lisp/penultttimate
+RUN make --directory=/root/common-lisp/penultttimate install
+# idk if the ldconfig is necessary
+# but better safe then wrestling with the loader
+RUN ldconfig
 
+# sbcl will consume an ungodly amount of heap on its first load of claw-raylib
+# get that out of the way so we can use it normally
+RUN sbcl --dynamic-space-size 4096 --eval '(ql:quickload :claw-raylib)' --eval'(exit)'

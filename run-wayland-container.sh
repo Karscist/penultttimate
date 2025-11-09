@@ -1,8 +1,5 @@
 #!/usr/bin/env sh
 
-# questo sembra figo ma non saprei che cazzo farci onestamente
-# --mount type=bind,source="${HOME}/Downloads",target="/root/Downloads" \
-
 docker run \
   -it \
   --rm \
@@ -12,5 +9,5 @@ docker run \
   --mount type=bind,source="${XDG_RUNTIME_DIR}/pipewire-0",target="/tmp/pipewire-0" \
   --device /dev/dri \
   --device /dev/snd \
-  mamma:fucker\
+  "$1" \
   bash

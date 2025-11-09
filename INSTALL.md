@@ -1,6 +1,6 @@
 > this file is more implementer oriented than user oriented, pardon
 > it is closer to a "lay of the land"
-> what I would have liked to have read when I first got into this project
+> it's what I would have liked to have read when I first got into this project
 > and less of an `INSTALL.md`
 > but it's far closer to an `INSTALL.md` than to a `README.md` so...
 
@@ -19,6 +19,7 @@ So we use the [prebuild](https://github.com/bohonghuang/claw-raylib/tree/prebuil
 We use `sbcl` as our common lisp implementation of choice, the code should be implementation independant but we haven't tested it, and `sbcl` is the default parameter for anything that takes a lisp.
 
 You'll also need a c compiler to build the claw generated wrappers, `clang` and `gcc` should both work but we only tested `gcc` and it's the default one in all our build scripts.
+You will also need `make` to run the build scripts in question.
 
 To install the lisp libraries used in this project you'll also need `quicklisp`
 
@@ -32,16 +33,13 @@ The flags we pass to raylib's `Makefile`, which determine among other things "do
 `build.lisp` is used to compile the pre-generated raylib binding source code.
 The compilation target for the bindings (in this case `x86_64-pc-linux-gnu`) is currently hardcoded inside `build.lisp`, you will have to edit the file if you're compiling them for another target.
 
-## Actually Building It
-ha
-
 # Docker Image
 For the author to deal with how shit it is to manage cl installations, and mostly because bushek is doing this from wsl, we have a docker image with the basics required to set up a development environment for this thing with wayland  
 We don't have it on dockerhub or anything yet, there's just a `Dockerfile` in the project's root directory, copy that somewhere and do your docker things.  
 
-To run the container in such a way that you may run a wayland application on the container and have it actually show up on your desktop there's also a `run-wayland-container.sh` in the project root  
+To run the container in such a way that you may run a wayland application on the container and have it actually show up on your desktop there's also a `run-wayland-container.sh` in the project root.  
 
-installation through docker image would then amount to
+Installation through docker image would then amount to
 ```sh
 # wherever it is you copied the dockerfile
 mkdir some/directory/whatever
@@ -54,4 +52,64 @@ chmod +x run-wayland-container.sh # it should already be executable but just in 
 ./run-wayland-container.sh name-you-wanna:give-the-image
 ```
 
+`run-wayland-container.sh` currently does a `docker run --rm` (that is to say, it deletes the container the moment you exit) as I'm iterating on the image quite a lot and would rather not keep corpses around.
+
 # Local Install
+> NOTE: these instruction are currently only for linux
+> idk how other systems work
+To install on your os instead of using docker - assuming you have sbcl, quicklisp, gcc, make&Co. installed - you'll first of all want to install the dependencies to compile raylib itself (as we will do it later)
+
+On redhat and similar (that is, on fedora)
+```sh
+# for raylib
+sudo dnf install alsa-lib-devel mesa-libGL-devel libX11-devel libXrandr-devel libXi-devel libXcursor-devel libXinerama-devel libatomic
+# if you also want wayland
+RUN apt install -y wayland-protocols libwayland-dev libxkbcommon-dev
+```
+
+On debian and similar (that is, on mint or ubuntu)
+```sh
+# for raylib
+sudo apt install libasound2-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev libxcursor-dev libxinerama-dev libwayland-dev libxkbcommon-dev
+# if you also want wayland
+sudo dnf install wayland-devel libxkbcommon-devel wayland-protocols-devel
+```
+for further info/details see [raylib's own docs](https://github.com/raysan5/raylib/wiki/Working-on-GNU-Linux)
+
+You'll then want to install `claw-raylib`, so go to your `quicklisp/local-projects` and
+```sh
+git clone --depth=1 https://github.com/bohonghuang/claw-raylib/
+git clone --depth=1 https://github.com/bohonghuang/cffi-object
+git clone --depth=1 https://github.com/bohonghuang/cffi-ops
+```
+for further info/details, once more, [see their own docs](https://github.com/bohonghuang/claw-raylib)
+
+Then actually clone `penultttimate`, we have `raylib`, `raygui`, and `claw-raylib` as submodules so we clone recursively, for asdf not to shit itself and die you'll want to clone `penultttimate` somewhere asdf knows about, such as in `~/common-lisp` or in another directory you added to your asdf registry
+
+```sh
+git clone --recursive --depth=1 \
+          https://github.com/Karscist/penultttimate \
+
+cd penultttimate
+make
+make install
+ldconfig # idk if it's needed but why not
+```
+
+# Quick Sanity Check
+To test your install, be it local or to check wether your container works or not, you can try running the following hello world script to see if it dispalys a simple window (as it should do) or crashes down in fiery glory (as it probably should not do).
+```lisp
+(ql:quickload :claw-raylib)
+
+(defun basic-window ()
+  (let ((screen-width 800)
+        (screen-height 450))
+    (raylib:with-window ("raylib [core] example - basic window" (screen-width screen-height))
+      (raylib:set-target-fps 60)
+      (loop :until (raylib:window-should-close)
+            :do (raylib:with-drawing
+                    (raylib:clear-background raylib:+raywhite+)
+                  (raylib:draw-text "Congrats! You created your first window!" 190 200 20 raylib:+lightgray+))))))
+
+(basic-window)
+```
