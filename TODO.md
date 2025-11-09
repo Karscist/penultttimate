@@ -1,11 +1,11 @@
 - docker things
-  - [ ] clean up cruft from dockerfile
+  - [X] clean up cruft from dockerfile
   - [ ] clean up cruft from docker run script
   - [ ] create xorg docker image
   - [ ] test wayland docker image on wsl
   - [ ] upload the damn thing somewhere (dockerhub?)
   - [ ] improve my lackluster directory strcuture and rather shoddy heirarchy
 - build things
-  - [ ] add flag to makefile to toggle wether to include wayland support or not (have behaviour depend on the value `XDG_SESSION_TYPE`?)
+  - [ ] add flag to makefile to toggle wether to include wayland support or not (have default behaviour depend on the value `XDG_SESSION_TYPE`?)
 - code things
   - [ ] should probably start writing it

@@ -37,7 +37,7 @@ The compilation target for the bindings (in this case `x86_64-pc-linux-gnu`) is 
 For the author to deal with how shit it is to manage cl installations, and mostly because bushek is doing this from wsl, we have a docker image with the basics required to set up a development environment for this thing with wayland  
 We don't have it on dockerhub or anything yet, there's just a `Dockerfile` in the project's root directory, copy that somewhere and do your docker things.  
 
-To run the container in such a way that you may run a wayland application on the container and have it actually show up on your desktop there's also a `run-wayland-container.sh` in the project root.  
+To run the container in such a way that you may run a wayland application on the container and have it actually show up on your desktop there's also a `run-wayland-container.sh` (mostly adapated from [https://github.com/hemashushu/docker-archlinux-gui]) in the project root.  
 
 Installation through docker image would then amount to
 ```sh
