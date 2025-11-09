@@ -14,7 +14,6 @@ BINDIR = $(DESTDIR)/bin
 
 .PHONY: all install uninstall clean
 
-
 install:
 	cp $(HEADER) $(IMPL)
 	$(CC) -o $(TARGET) $(IMPL) -shared -fpic -DRAYGUI_IMPLEMENTATION $(CFLAGS)
@@ -28,7 +27,6 @@ uninstall:
 	rm -f $(INCLUDEDIR)/$(HEADER)
 	rm -f $(BINDIR)/$(HEADER)
 	rm -f $(LIBDIR)/$(HEADER)
-
 
 clean:
 	rm -f *.o *.a *.so raygui.c

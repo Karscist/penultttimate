@@ -5,7 +5,7 @@ RAYLIB_DIR = raylib
 RAYGUI_DIR = raygui
 CLAW_DIR = claw-raylib
 RAYGUI_MAKEFILE = $(RAYGUI_DIR)/src/Makefile
-RAYLIB_FLAGS = PLATFORM=PLATFORM_DESKTOP RAYLIB_LIBTYPE=SHARED
+RAYLIB_FLAGS = PLATFORM=PLATFORM_DESKTOP RAYLIB_LIBTYPE=SHARED GLFW_LINUX_ENABLE_WAYLAND=TRUE
 LISP ?= sbcl --dynamic-space-size 4096
 
 .PHONY: all raylib raygui install uninstall clean
@@ -33,9 +33,9 @@ claw-install:
 install: raylib-install raygui-install claw-install
 
 uninstall:
-
 	 $(MAKE) -C $(RAYGUI_DIR)/src/ uninstall
 	 $(MAKE) -C $(RAYLIB_DIR)/src/ uninstall
+
 clean:
 	$(MAKE) -C $(RAYLIB_DIR)/src/ clean || true
 	$(MAKE) -C $(RAYGUI_DIR)/src/ clean || true
